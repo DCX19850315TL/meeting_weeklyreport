@@ -1,0 +1,6 @@
+2019-04-25 14:24:31 meeting_weeklyreport.py(11 - MainProcess - MainThread - <module>): INFO aaa
+2019-04-25 14:24:56 meeting_weeklyreport.py(11 - MainProcess - MainThread - <module>): ERROR aaa
+2019-04-25 14:25:11 meeting_weeklyreport.py(11 - MainProcess - MainThread - <module>): ERROR aaa
+NoneType: None
+2019-04-25 14:25:22 meeting_weeklyreport.py(11 - MainProcess - MainThread - <module>): ERROR bbb
+NoneType: None
