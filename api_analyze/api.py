@@ -14,24 +14,31 @@ from urllib.error import HTTPError
 from urllib.error import ContentTooShortError
 import json
 from retrying import retry
+import configparser
+import os
 
 from common.logger import logger
 
-#用户中心的接口
-usercenter_api = "http://103.25.23.99/EnterpriseUserCenter/eucService"
+#获取配置文件中的值
+setting_path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))),"conf\setting.ini")
+conf = configparser.ConfigParser()
+conf.read(setting_path,encoding="utf-8")
+usercenter_api = conf.get("api_analyze","usercenter_api")
 headers = {"Content-type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest"}
 
 class GetUserInfo(object):
 
+    @retry(stop_max_attempt_number=3,wait_fixed=2000)
     def GetUserInfoApi(self,url,params,header):
-        UserParams = {"service":"searchAccount","params":{"nubeNumbers":params}}
-        UserStr = urllib.parse.urlencode(UserParams)
-        Url = url + "?" + UserStr
-        request = urllib.request.Request(url=Url,headers=header)
         try:
-            response = urllib.request.urlopen(request,timeout=1)
-        except URLError as e:
-            print(e.reason)
+            UserParams = {"service": "searchAccount", "params": {"nubeNumbers": params}}
+            UserStr = urllib.parse.urlencode(UserParams)
+            Url = url + "?" + UserStr
+            request = urllib.request.Request(url=Url, headers=header)
+            response = urllib.request.urlopen(request, timeout=10)
+        except Exception:
+            print("重新调用用户中心的接口")
+            raise Exception(10040)
         else:
             response_result = response.read().decode('utf-8')
             response_dict = json.loads(response_result)
@@ -43,8 +50,15 @@ class GetUserInfo(object):
 class send_api(object):
     #调用API接口，获取返回值
     def Post_Data_Api(self,url,params,headers):
-        r = requests.post(url=url,data=params,headers=headers)
-        return r.json()
+        try:
+            r = requests.post(url=url,data=params,headers=headers)
+        except requests.exceptions.ConnectionError as e:
+            if "10054" in str(e.args[0]):
+                raise Exception(10054)
+            elif "10061" in str(e.args[0]):
+                raise Exception(10061)
+        else:
+            return r.json()
 
     #求会议号列表
     def Meeting_List(self,Meeting_Number):
@@ -100,24 +114,28 @@ class send_api(object):
 
     #视频号和用户中心的名称进行匹配
     def number_and_usercenter(self,number_list):
-
-        GetUserInfo_Api = GetUserInfo()
-        print("开始调用用户中心接口")
-        GetUserInfoResult = GetUserInfo_Api.GetUserInfoApi(url=usercenter_api, params=number_list,
-                                                           header=headers)
-        number_usercenter_list = []
-        for i in number_list:
-            for j in range(len(GetUserInfoResult["users"])):
-                UserInfoNumber = GetUserInfoResult["users"][j]["nubeNumber"]
-                if "nickName" in GetUserInfoResult["users"][j].keys():
-                    nickName = GetUserInfoResult["users"][j]["nickName"]
-                else:
-                    nickName = "未命名"
-                if i == UserInfoNumber:
-                    usercenter_number = "%s_%s" % (i,nickName)
-                    number_usercenter_list.append(usercenter_number)
-        print("用户中心接口调用完毕,视频号和匿名匹配完毕")
-        return number_usercenter_list
+        try:
+            GetUserInfo_Api = GetUserInfo()
+            print("开始调用用户中心接口")
+            GetUserInfoResult = GetUserInfo_Api.GetUserInfoApi(url=usercenter_api, params=number_list,
+                                                               header=headers)
+        except Exception as e:
+            if e.args[0] == 10040:
+                return 10041
+        else:
+            number_usercenter_list = []
+            for i in number_list:
+                for j in range(len(GetUserInfoResult["users"])):
+                    UserInfoNumber = GetUserInfoResult["users"][j]["nubeNumber"]
+                    if "nickName" in GetUserInfoResult["users"][j].keys():
+                        nickName = GetUserInfoResult["users"][j]["nickName"]
+                    else:
+                        nickName = "未命名"
+                    if i == UserInfoNumber:
+                        usercenter_number = "%s_%s" % (i,nickName)
+                        number_usercenter_list.append(usercenter_number)
+            print("用户中心接口调用完毕,视频号和匿名匹配完毕")
+            return number_usercenter_list
 
     #根据响应的内容进行数据的这整理和端到端总体合格率的计算
     def Analyze_Response(self,response_data,excel_data=None):
@@ -170,20 +188,29 @@ class send_api(object):
                         print("开始匹配视频号对应的昵称")
                         # 将视频号和用户中心的昵称进行匹配，匹配结果为"视频号_别名"
                         meeting_number_end_list = self.number_and_usercenter(meeting_number_list)
-                        result_dict = {
-                            "Meeting_Number": k,
-                            "Meeting_Name": MeetingName,
-                            "Start_Time":start_time,
-                            "End_Time":end_time,
-                            "Number_Count":meeting_number_count,
-                            "Percent":PtoP_Count_Percent,
-                            "Number_List":meeting_number_end_list,
-                            "Unqualified_List":unqualified_list
-                        }
-                        result_list.append(result_dict)
-                        all_number_list = []
-                        is_Good_Count = 0
-                        unqualified_list = []
+                        if meeting_number_end_list != 10041:
+                            result_dict = {
+                                "Meeting_Number": k,
+                                "Meeting_Name": MeetingName,
+                                "Start_Time":start_time,
+                                "End_Time":end_time,
+                                "Number_Count":meeting_number_count,
+                                "Percent":PtoP_Count_Percent,
+                                "Number_List":meeting_number_end_list,
+                                "Unqualified_List":unqualified_list
+                            }
+                            result_list.append(result_dict)
+                            all_number_list = []
+                            is_Good_Count = 0
+                            unqualified_list = []
+                        else:
+                            result_list = {
+                                "Meeting_Number": k,
+                                "Meeting_Name": MeetingName,
+                                "Start_Time": start_time,
+                                "End_Time": end_time,
+                                "Number_Count": 10041
+                            }
                     else:
                         result_list = [{
                             "Meeting_Number": k,
@@ -196,6 +223,5 @@ class send_api(object):
                             "Unqualified_List": ""
                         }]
                 return result_list
-
         else:
             raise Exception("接口请求响应有问题",)

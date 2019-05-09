@@ -159,3 +159,20 @@ class file_format(object):
         #json_params = json.dumps(params)
         #return json_params
         return params
+
+def list_comparison_list(count_list,analyze_list,filename):
+    for i in count_list:
+        for j in analyze_list:
+            if i["mid"] == j["mid"] and i["time"][0]["startTime"] == j["time"][0]["startTime"] and i["time"][0]["endTime"] == j["time"][0]["endTime"]:
+                count_list.remove(i)
+    result_list = []
+    for k in count_list:
+        count_dict = {
+            "name":k["mid"],
+            "begTS":k["time"][0]["startTime"],
+            "endTS":k["time"][0]["endTime"]
+        }
+        result_list.append(count_dict)
+    with open(filename,'w') as f:
+        f.truncate()
+        f.write(json.dumps(result_list))
