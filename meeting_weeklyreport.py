@@ -144,8 +144,8 @@ if __name__ == "__main__":
         #将响应的数据格式化后写入到excel中
         excel_into = ExcelHandle(excel_path=excel_name, is_excel=is_excel)
         excel_into.set_excel_data(excel_file=excel_file,excel_backup_dir=excel_backup_dir,excel_backup_file=excel_backup_file,response_list=response_api_Analyze_list)
-        print("写入excel数据完毕")
-        logger().info("写入excel数据完毕")
+        print("整理的全部数据写入excel完毕")
+        logger().info("整理的全部数据写入excel完毕")
 
     #判断用户中心名称匹配失败的列表是否为空，不为空的话将失败的会议号信息写入到txt中，已备重新分析
     if fail_usercenter_api_list == []:
