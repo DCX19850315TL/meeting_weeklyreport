@@ -20,7 +20,8 @@ import os
 from common.logger import logger
 
 #获取配置文件中的值
-setting_path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))),"conf\setting.ini")
+#setting_path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))),"conf\setting.ini")
+setting_path = os.path.join(os.path.abspath('conf'),'setting.ini')
 conf = configparser.ConfigParser()
 conf.read(setting_path,encoding="utf-8")
 usercenter_api = conf.get("api_analyze","usercenter_api")
@@ -38,6 +39,7 @@ class GetUserInfo(object):
             response = urllib.request.urlopen(request, timeout=10)
         except Exception:
             print("重新调用用户中心的接口")
+            logger().error("重新调用用户中心的接口")
             raise Exception(10040)
         else:
             response_result = response.read().decode('utf-8')
@@ -117,6 +119,7 @@ class send_api(object):
         try:
             GetUserInfo_Api = GetUserInfo()
             print("开始调用用户中心接口")
+            logger().info("开始调用用户中心接口")
             GetUserInfoResult = GetUserInfo_Api.GetUserInfoApi(url=usercenter_api, params=number_list,
                                                                header=headers)
         except Exception as e:
@@ -134,7 +137,8 @@ class send_api(object):
                     if i == UserInfoNumber:
                         usercenter_number = "%s_%s" % (i,nickName)
                         number_usercenter_list.append(usercenter_number)
-            print("用户中心接口调用完毕,视频号和匿名匹配完毕")
+            print("用户中心接口调用完毕,视频号和昵称匹配完毕")
+            logger().info("用户中心接口调用完毕,视频号和昵称匹配完毕")
             return number_usercenter_list
 
     #根据响应的内容进行数据的这整理和端到端总体合格率的计算
@@ -149,6 +153,7 @@ class send_api(object):
             #k为会议号
             for k,v in data_dict["result"].items():
                 print("开始匹配会议名称")
+                logger().info("开始匹配会议名称")
                 if excel_data == None:
                     MeetingName = "临时会议" + "(" + k + ")"
                 else:
@@ -161,6 +166,7 @@ class send_api(object):
                         #获取端到端总数个数
                         ptop_count = self.PtoP_Count(list(vv["c2c"].keys()))
                         print("开始匹配会议的起始时间和结束时间")
+                        logger().info("开始匹配会议的起始时间和结束时间")
                         #获取起始时间和结束时间
                         start_time = self.Time_Split(kk)[0]
                         end_time = self.Time_Split(kk)[1]
@@ -172,6 +178,7 @@ class send_api(object):
                             #获取会议内终端视频号和视频号个数
                             meeting_number_list = self.Get_Meeting_Number(all_number_list)[0]
                             print("开始匹配会议的参会人数")
+                            logger().info("开始匹配会议的参会人数")
                             meeting_number_count = self.Get_Meeting_Number(all_number_list)[1]
                             #空音包丢包率
                             Sound_Package_Percent = self.Sound_Package_Percent(vvv["eBadNum"],vvv["eAllNum"])
@@ -181,11 +188,14 @@ class send_api(object):
                                 is_Good_Count+=1
                             else:
                                 print("将不合格的端到端添加到列表")
+                                logger().info("将不合格的端到端添加到列表")
                                 unqualified_list.append(kkk)
                         print("开始求端到端总体合格率")
+                        logger().info("开始求端到端总体合格率")
                         #求端到端总体合格率
                         PtoP_Count_Percent = str(round(is_Good_Count / ptop_count * 100,2)) + "%"
                         print("开始匹配视频号对应的昵称")
+                        logger().info("开始匹配视频号对应的昵称")
                         # 将视频号和用户中心的昵称进行匹配，匹配结果为"视频号_别名"
                         meeting_number_end_list = self.number_and_usercenter(meeting_number_list)
                         if meeting_number_end_list != 10041:

@@ -13,13 +13,15 @@ import logging.handlers
 import configparser
 
 #定义setting配置文件路径
-parent_dir = os.path.dirname(os.path.dirname(__file__))
-setting_file = os.path.join(parent_dir,'conf\setting.ini')
+#parent_dir = os.path.dirname(os.path.dirname(__file__))
+#setting_file = os.path.join(parent_dir,'conf\setting.ini')
+setting_file = os.path.join(os.path.abspath('conf'),'setting.ini')
 conf = configparser.ConfigParser()
 conf.read(setting_file,"utf-8")
 #日志名称
 LogName = conf.get("log","name")
-LogFile = os.path.join(parent_dir,'logs\{LogName}'.format(LogName=LogName))
+#LogFile = os.path.join(parent_dir,'logs\{LogName}'.format(LogName=LogName))
+LogFile = os.path.join(os.path.abspath('logs'),'%s' % (LogName))
 #日志级别
 LogLevel = conf.get("log","level")
 #单个日志文件的大小
