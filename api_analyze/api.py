@@ -36,7 +36,7 @@ class GetUserInfo(object):
             UserStr = urllib.parse.urlencode(UserParams)
             Url = url + "?" + UserStr
             request = urllib.request.Request(url=Url, headers=header)
-            response = urllib.request.urlopen(request, timeout=10)
+            response = urllib.request.urlopen(request, timeout=60)
         except Exception:
             print("重新调用用户中心的接口")
             logger().error("重新调用用户中心的接口")
