@@ -166,4 +166,4 @@ if __name__ == "__main__":
     h,m = divmod(m,60)
     count_time_time = ("%02d:%02d:%02d" % (h, m, s))
     print("会议分析程序结束的时间:%s,总共用时%s" % (today_time,count_time_time))
-    logger().info("会议分析程序结束的时间:%s,总共用时%s" % (today_time,count_time_time))
+    logger().info("会议分析完毕，结束的时间:%s,总共用时%s" % (today_time,count_time_time))

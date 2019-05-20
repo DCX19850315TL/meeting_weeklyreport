@@ -161,77 +161,91 @@ class send_api(object):
                     MeetingName = self.Number_to_Meeting(k,excel_data)
                 #kk为时间段
                 for kk,vv in v.items():
-                    c2c_dict = vv["c2c"]
-                    if c2c_dict != {}:
-                        #获取端到端总数个数
-                        ptop_count = self.PtoP_Count(list(vv["c2c"].keys()))
-                        print("开始匹配会议的起始时间和结束时间")
-                        logger().info("开始匹配会议的起始时间和结束时间")
-                        #获取起始时间和结束时间
+                    if vv:
+                        c2c_dict = vv["c2c"]
+                        if c2c_dict != {}:
+                            #获取端到端总数个数
+                            ptop_count = self.PtoP_Count(list(vv["c2c"].keys()))
+                            print("开始匹配会议的起始时间和结束时间")
+                            logger().info("开始匹配会议的起始时间和结束时间")
+                            #获取起始时间和结束时间
+                            start_time = self.Time_Split(kk)[0]
+                            end_time = self.Time_Split(kk)[1]
+                            #kkk为端到端的视频号11111111->22222222,vvv为丢包率的详细信息
+                            for kkk,vvv in vv["c2c"].items():
+                                #将每个时间段内的视频号添加到一个列表中
+                                for item in kkk.split("->"):
+                                    all_number_list.append(item)
+                                #获取会议内终端视频号和视频号个数
+                                meeting_number_list = self.Get_Meeting_Number(all_number_list)[0]
+                                print("开始匹配会议的参会人数")
+                                logger().info("开始匹配会议的参会人数")
+                                meeting_number_count = self.Get_Meeting_Number(all_number_list)[1]
+                                #空音包丢包率
+                                Sound_Package_Percent = self.Sound_Package_Percent(vvv["eBadNum"],vvv["eAllNum"])
+                                #判断端到端合格个数
+                                is_Good = self.Good_PtoP(vvv["eBadNum"],Sound_Package_Percent,vvv["lostBadNum"])
+                                if is_Good == 1:
+                                    is_Good_Count+=1
+                                else:
+                                    print("将不合格的端到端添加到列表")
+                                    logger().info("将不合格的端到端添加到列表")
+                                    unqualified_list.append(kkk)
+                            print("开始求端到端总体合格率")
+                            logger().info("开始求端到端总体合格率")
+                            #求端到端总体合格率
+                            PtoP_Count_Percent = str(round(is_Good_Count / ptop_count * 100,2)) + "%"
+                            print("开始匹配视频号对应的昵称")
+                            logger().info("开始匹配视频号对应的昵称")
+                            # 将视频号和用户中心的昵称进行匹配，匹配结果为"视频号_别名"
+                            meeting_number_end_list = self.number_and_usercenter(meeting_number_list)
+                            if meeting_number_end_list != 10041:
+                                result_dict = {
+                                    "Meeting_Number": k,
+                                    "Meeting_Name": MeetingName,
+                                    "Start_Time":start_time,
+                                    "End_Time":end_time,
+                                    "Number_Count":meeting_number_count,
+                                    "Percent":PtoP_Count_Percent,
+                                    "Number_List":meeting_number_end_list,
+                                    "Unqualified_List":unqualified_list
+                                }
+                                result_list.append(result_dict)
+                                all_number_list = []
+                                is_Good_Count = 0
+                                unqualified_list = []
+                            else:
+                                result_list = {
+                                    "Meeting_Number": k,
+                                    "Meeting_Name": MeetingName,
+                                    "Start_Time": start_time,
+                                    "End_Time": end_time,
+                                    "Number_Count": 10041
+                                }
+                        else:
+                            result_list = [{
+                                "Meeting_Number": k,
+                                "Meeting_Name": MeetingName,
+                                "Start_Time": self.Time_Split(kk)[0],
+                                "End_Time": self.Time_Split(kk)[1],
+                                "Number_Count": 0,
+                                "Percent": "",
+                                "Number_List": "",
+                                "Unqualified_List": ""
+                            }]
+                    else:
                         start_time = self.Time_Split(kk)[0]
                         end_time = self.Time_Split(kk)[1]
-                        #kkk为端到端的视频号11111111->22222222,vvv为丢包率的详细信息
-                        for kkk,vvv in vv["c2c"].items():
-                            #将每个时间段内的视频号添加到一个列表中
-                            for item in kkk.split("->"):
-                                all_number_list.append(item)
-                            #获取会议内终端视频号和视频号个数
-                            meeting_number_list = self.Get_Meeting_Number(all_number_list)[0]
-                            print("开始匹配会议的参会人数")
-                            logger().info("开始匹配会议的参会人数")
-                            meeting_number_count = self.Get_Meeting_Number(all_number_list)[1]
-                            #空音包丢包率
-                            Sound_Package_Percent = self.Sound_Package_Percent(vvv["eBadNum"],vvv["eAllNum"])
-                            #判断端到端合格个数
-                            is_Good = self.Good_PtoP(vvv["eBadNum"],Sound_Package_Percent,vvv["lostBadNum"])
-                            if is_Good == 1:
-                                is_Good_Count+=1
-                            else:
-                                print("将不合格的端到端添加到列表")
-                                logger().info("将不合格的端到端添加到列表")
-                                unqualified_list.append(kkk)
-                        print("开始求端到端总体合格率")
-                        logger().info("开始求端到端总体合格率")
-                        #求端到端总体合格率
-                        PtoP_Count_Percent = str(round(is_Good_Count / ptop_count * 100,2)) + "%"
-                        print("开始匹配视频号对应的昵称")
-                        logger().info("开始匹配视频号对应的昵称")
-                        # 将视频号和用户中心的昵称进行匹配，匹配结果为"视频号_别名"
-                        meeting_number_end_list = self.number_and_usercenter(meeting_number_list)
-                        if meeting_number_end_list != 10041:
-                            result_dict = {
-                                "Meeting_Number": k,
-                                "Meeting_Name": MeetingName,
-                                "Start_Time":start_time,
-                                "End_Time":end_time,
-                                "Number_Count":meeting_number_count,
-                                "Percent":PtoP_Count_Percent,
-                                "Number_List":meeting_number_end_list,
-                                "Unqualified_List":unqualified_list
-                            }
-                            result_list.append(result_dict)
-                            all_number_list = []
-                            is_Good_Count = 0
-                            unqualified_list = []
-                        else:
-                            result_list = {
-                                "Meeting_Number": k,
-                                "Meeting_Name": MeetingName,
-                                "Start_Time": start_time,
-                                "End_Time": end_time,
-                                "Number_Count": 10041
-                            }
-                    else:
-                        result_list = [{
+                        result_list = {
                             "Meeting_Number": k,
                             "Meeting_Name": MeetingName,
-                            "Start_Time": self.Time_Split(kk)[0],
-                            "End_Time": self.Time_Split(kk)[1],
+                            "Start_Time": start_time,
+                            "End_Time": end_time,
                             "Number_Count": 0,
                             "Percent": "",
                             "Number_List": "",
                             "Unqualified_List": ""
-                        }]
-                return result_list
+                        }
+            return result_list
         else:
             raise Exception("接口请求响应有问题",)
