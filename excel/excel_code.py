@@ -10,6 +10,7 @@ import os
 import shutil
 from openpyxl import load_workbook
 from openpyxl import Workbook
+from openpyxl.styles import NamedStyle,Font,Border,Side,PatternFill
 
 class ExcelHandle(object):
 
@@ -30,6 +31,7 @@ class ExcelHandle(object):
             excel_data_list.append(table_data)
             table_data = {}
         return excel_data_list
+
     #将最终格式化后的数据列表写入到excel中
     def set_excel_data(self,excel_file,excel_backup_dir,excel_backup_file,response_list):
         if not os.path.exists(excel_backup_dir):
@@ -37,9 +39,11 @@ class ExcelHandle(object):
         if os.path.isfile(excel_file):
             backup_file = os.path.join(excel_backup_dir, excel_backup_file)
             shutil.move(excel_file,backup_file)
-        Header = {"A1":"会议号","B1":"会议室名称","C1":"开始时间","D1":"结束时间","E1":"参会方数","F1":"合格率","G1":"参会终端视讯号","H1":"不合格端到端信息"}
+        Header = {"A1":"会议号","B1":"会议室名称","C1":"开始时间","D1":"结束时间","E1":"参会方数","F1":"合格率","G1":"参会终端视讯号","H1":"不合格端到端信息","I1":"不合格的原因","J1":"丢包时长累加","K1":"最大时延占比","L1":"CPU异常时间"}
         wb = Workbook()
         ws = wb.active
+        #highlight = NamedStyle(name="highlight")
+        #highlight.fill = PatternFill("solid",fgColor="FFFF00")
         for k,v in Header.items():
             ws[k] = v
             wb.save(excel_file)
@@ -52,8 +56,13 @@ class ExcelHandle(object):
                 "E%d" % (item + 2):response_list[item]["Number_Count"],
                 "F%d" % (item + 2):response_list[item]["Percent"],
                 "G%d" % (item + 2):"\n".join(response_list[item]["Number_List"]),
-                "H%d" % (item + 2):"\n".join(response_list[item]["Unqualified_List"])
+                "H%d" % (item + 2):"\n".join(response_list[item]["Unqualified_List"]),
+                "I%d" % (item + 2):"\n".join(response_list[item]["Unqualified_Reason"]),
+                "J%d" % (item + 2):"\n".join(response_list[item]["Loss_TotalTime"]),
+                "K%d" % (item + 2):"\n".join(response_list[item]["Delay_Max"]),
+                "L%d" % (item + 2):"\n".join(response_list[item]["CPU_AbnormalTime"])
             }
             for k,v in Body.items():
                 ws[k] = v
+                #ws[k].style = highlight
                 wb.save(excel_file)

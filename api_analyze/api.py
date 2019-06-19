@@ -26,6 +26,19 @@ conf = configparser.ConfigParser()
 conf.read(setting_path,encoding="utf-8")
 usercenter_api = conf.get("api_analyze","usercenter_api")
 headers = {"Content-type": "application/x-www-form-urlencoded", "X-Requested-With": "XMLHttpRequest"}
+confreport_api = conf.get("api_analyze","confReport_api")
+loss_time = int(conf.get("api_analyze","loss_time"))
+delay_percent = float(conf.get("api_analyze","delay_percent"))
+cpu_percent = float(conf.get("api_analyze","cpu_percent"))
+ErrorCode = {
+            1:"终端上行网络丟包、抖动",
+            2:"终端上行网络丟包",
+            3:"终端上行网络抖动",
+            11:"终端下行网络丟包、抖动",
+            22:"终端下行网络丟包",
+            33:"终端下行网络抖动",
+            4:"终端CPU过载"
+        }
 
 class GetUserInfo(object):
 
@@ -45,9 +58,6 @@ class GetUserInfo(object):
             response_result = response.read().decode('utf-8')
             response_dict = json.loads(response_result)
             return response_dict
-
-#user_api = GetUserInfo()
-#user_api.GetUserInfoApi(url=usercenter_api,params=["69900307"],header=headers)
 
 class send_api(object):
     #调用API接口，获取返回值
@@ -141,7 +151,7 @@ class send_api(object):
             logger().info("用户中心接口调用完毕,视频号和昵称匹配完毕")
             return number_usercenter_list
 
-    #根据响应的内容进行数据的这整理和端到端总体合格率的计算
+    #根据响应的内容进行数据的整理和端到端总体合格率的计算
     def Analyze_Response(self,response_data,excel_data=None):
         data_dict = response_data
         is_Good_Count = 0
@@ -249,3 +259,405 @@ class send_api(object):
             return result_list
         else:
             raise Exception("接口请求响应有问题",)
+
+class confReport(object):
+
+    #判断Unqualified_List是否为空来获取对应的Meeting_Number，Start_Time和Unqualified_List的数据
+    def GetPostData(self,**kwargs):
+
+        Unqualified_List = kwargs["data"]["Unqualified_List"]
+        if Unqualified_List == []:
+            return "Null"
+        else:
+            StartTime = kwargs["data"]["Start_Time"].split( )[0]
+            return (kwargs["data"]["Meeting_Number"],StartTime,Unqualified_List)
+
+    #调用ConfReportApi获取数据
+    def GetConfReportApi(self,MeetingId,TodayTime):
+
+        params = {"meetingId":MeetingId,"TS":TodayTime}
+        r = requests.get(url=confreport_api,params=params)
+        return r.json()
+
+    #返回重复的会议号列表
+    def response_repeat_number(self, number_list):
+        if number_list == 0:
+            b = 0
+        else:
+            repeat_list = []
+            b = list(set(number_list))
+        return (b)
+
+    #返回不合格的视频号_原因列表
+    def AnalysisConfReportData(self,*args,**kwargs):
+
+        #传进来的不合格终端的数量69900242->69900241
+        list_len = len(args[0])
+        #接口调用后的User数据,列表
+        UserList = kwargs["data"]["User"]
+        #不合格的原因列表
+        Unqualified_Reason_List = []
+        #总的不合格的原因列表
+        Total_Unqualified_Reason_List= []
+        #新的不合格的原因列表
+        New_Total_Unqualified_Reason_List = []
+        #CPU异常计数
+        CpuCount = 0
+        #网络异常计数
+        NetworkCount = 0
+        for i in range(list_len):
+            list_i = args[0][i].split("->")
+            #主叫的视频号
+            caller = list_i[0]
+            # 被叫的视频号
+            called = list_i[1]
+            for j in UserList:
+                #User列表下的UserId数据
+                UserId = j["UserId"]
+                #User列表下的ASReport数据
+                ASReport = j["ASReport"]
+                #判断上行
+                if caller == UserId:
+                    #求CPU是否异常
+                    TotalTime = j["LastTS"] - j["BegTS"]
+                    if j["CpuRate80C"] == 0:
+                        CpuException = 0.0
+                    else:
+                        CpuException = round(j["CpuRate80C"] * 5 / TotalTime * 100,2)
+                    if CpuException > cpu_percent:
+                        Unqualified_Reason_List.append("%s_%s" % (caller, ErrorCode[4]))
+                    if ASReport == None:
+                        continue
+                    else:
+                        for k in ASReport:
+                            if caller == k["SpeakerId"]:
+                                UpToRelayLoss = k["LossRateFinalC"] * 5
+                                UpToRelayDelayTotal = k["DelayTimeCnf"] + k["DelayTimeEnt"] + k["DelayTimeFim"] + k["DelayTimeErr"]
+                                UpToRelayDelayTemp = k["DelayTimeFim"] + k["DelayTimeErr"]
+                                if UpToRelayDelayTemp == 0:
+                                    UpToRelayDelay = 0.0
+                                else:
+                                    UpToRelayDelay = round(UpToRelayDelayTemp / UpToRelayDelayTotal * 100,2)
+                                # 上行丢包和延迟问题同时存在
+                                if UpToRelayLoss >= loss_time and UpToRelayDelay > delay_percent:
+                                    Unqualified_Reason_List.append("%s_%s" % (caller,ErrorCode[1]))
+                                #上行丢包问题
+                                elif UpToRelayLoss >= loss_time:
+                                    Unqualified_Reason_List.append("%s_%s" % (caller, ErrorCode[2]))
+                                #上行延迟问题
+                                elif UpToRelayDelay > delay_percent:
+                                    Unqualified_Reason_List.append("%s_%s" % (caller, ErrorCode[3]))
+                    #print(Unqualified_Reason_List)
+                    for item in Unqualified_Reason_List:
+                        CodeNumber1 = item.split("_")[1]
+                        if CodeNumber1 == ErrorCode[4]:
+                            CpuCount += 1
+                        if CodeNumber1 == ErrorCode[1] or CodeNumber1 == ErrorCode[2] or CodeNumber1 == ErrorCode[3]:
+                            NetworkCount += 1
+                    if NetworkCount > 0 and CpuCount > 0:
+                        continue
+                    elif NetworkCount > 0:
+                        continue
+                    else:
+                        for item in UserList:
+                            if called == item["UserId"]:
+                                # 求CPU是否异常
+                                TotalTime = item["LastTS"] - item["BegTS"]
+                                if item["CpuRate80C"] == 0:
+                                    CpuException = 0.0
+                                else:
+                                    CpuException = round(item["CpuRate80C"] * 5 / TotalTime * 100, 2)
+                                if CpuException > cpu_percent:
+                                    Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[4]))
+                                if item["ASReport"] == None:
+                                    continue
+                                else:
+                                    for k in item["ASReport"]:
+                                        if k["SpeakerId"] == caller:
+                                            DownLoss = k["LossRateFinalC"] * 5
+                                            DownDelayTotal = k["DelayTimeCnf"] + k["DelayTimeEnt"] + k["DelayTimeFim"] + k["DelayTimeErr"]
+                                            DownDelayTemp = k["DelayTimeFim"] + k["DelayTimeErr"]
+                                            if DownDelayTemp == 0:
+                                                DownDelay = 0.0
+                                            else:
+                                                DownDelay = round(DownDelayTemp / DownDelayTotal * 100, 2)
+                                            if DownLoss >= loss_time and DownDelay > delay_percent:
+                                                Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[11]))
+                                            elif DownLoss >= loss_time:
+                                                Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[22]))
+                                            elif DownDelay > delay_percent:
+                                                Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[33]))
+
+            for item in Unqualified_Reason_List:
+                Total_Unqualified_Reason_List.append(item)
+            Unqualified_Reason_List = []
+            CpuCount = 0
+            NetworkCount = 0
+
+        #排除同一视频号多个重复故障原因
+        Loss_Delay = 0
+        for item in Total_Unqualified_Reason_List:
+            CodeNumber = item.split("_")[1]
+            if CodeNumber == ErrorCode[1] or CodeNumber == ErrorCode[2] or CodeNumber == ErrorCode[3]:
+                caller = item.split("_")[0]
+            elif CodeNumber == ErrorCode[11] or CodeNumber == ErrorCode[22] or CodeNumber == ErrorCode[33]:
+                called = item.split("_")[0]
+            else:
+                caller = item.split("_")[0]
+            if CodeNumber == ErrorCode[1]:
+                New_Total_Unqualified_Reason_List.append("%s_%s" % (caller,ErrorCode[1]))
+            elif CodeNumber == ErrorCode[11]:
+                New_Total_Unqualified_Reason_List.append("%s_%s" % (called,ErrorCode[11]))
+            elif CodeNumber == ErrorCode[2]:
+                for j in Total_Unqualified_Reason_List:
+                    VedioNumber_j = j.split("_")[0]
+                    CodeNumber_j = j.split("_")[1]
+                    if CodeNumber_j == ErrorCode[3] and VedioNumber_j == caller:
+                        Loss_Delay += 1
+                    elif CodeNumber_j == ErrorCode[1] and VedioNumber_j == caller:
+                        Loss_Delay += 1
+                if Loss_Delay >= 1:
+                    New_Total_Unqualified_Reason_List.append("%s_%s" % (caller, ErrorCode[1]))
+                else:
+                    New_Total_Unqualified_Reason_List.append(item)
+            elif CodeNumber == ErrorCode[3]:
+                for k in Total_Unqualified_Reason_List:
+                    VedioNumber_k = k.split("_")[0]
+                    CodeNumber_k = k.split("_")[1]
+                    if CodeNumber_k == ErrorCode[2] and VedioNumber_k == caller:
+                        Loss_Delay += 1
+                    elif CodeNumber_k == ErrorCode[1] and VedioNumber_k == caller:
+                        Loss_Delay += 1
+                if Loss_Delay >= 1:
+                    New_Total_Unqualified_Reason_List.append("%s_%s" % (caller, ErrorCode[1]))
+                else:
+                    New_Total_Unqualified_Reason_List.append(item)
+            elif CodeNumber == ErrorCode[22]:
+                for jj in Total_Unqualified_Reason_List:
+                    VedioNumber_jj = jj.split("_")[0]
+                    CodeNumber_jj = jj.split("_")[1]
+                    if CodeNumber_jj == ErrorCode[33] and VedioNumber_jj == called:
+                        Loss_Delay += 1
+                    elif CodeNumber_jj == ErrorCode[11] and VedioNumber_jj == called:
+                        Loss_Delay += 1
+                if Loss_Delay >= 1:
+                    New_Total_Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[11]))
+                else:
+                    New_Total_Unqualified_Reason_List.append(item)
+            elif CodeNumber == ErrorCode[33]:
+                for kk in Total_Unqualified_Reason_List:
+                    VedioNumber_kk = kk.split("_")[0]
+                    CodeNumber_kk = kk.split("_")[1]
+                    if CodeNumber_kk == ErrorCode[22] and VedioNumber_kk == called:
+                        Loss_Delay += 1
+                    elif CodeNumber_kk == ErrorCode[11] and VedioNumber_kk == called:
+                        Loss_Delay += 1
+                if Loss_Delay >= 1:
+                    New_Total_Unqualified_Reason_List.append("%s_%s" % (called, ErrorCode[11]))
+                else:
+                    New_Total_Unqualified_Reason_List.append(item)
+            elif CodeNumber == ErrorCode[4]:
+                New_Total_Unqualified_Reason_List.append(item)
+            Loss_Delay = 0
+
+        New_Total_Unqualified_Reason_List = self.response_repeat_number(number_list=New_Total_Unqualified_Reason_List)
+
+        return New_Total_Unqualified_Reason_List
+
+    #求不合格视频号的丢包时长累加，最大时延占比和CPU异常时间的数值
+    def AnalysisUnqualifiedData(self,UnqualifiedList,ResponseData):
+
+        # 问题最终保存的地方
+        err_dict = {}
+        #返回的数据列表信息
+        UserList = ResponseData["User"]
+        # 上行丢包总的时长初始值
+        UpLossTotal = 0
+        # 下行丢包总的时长初始值
+        DownLossTotal = 0
+        # 临时上行延迟列表
+        TempUpDelayList = []
+        # 临时下行延迟列表
+        TempDownDelayList = []
+        # CPU不合格的初始数值
+        CPU_AbnormalTime = 0
+        # CPU不合格的列表
+        CPU_AbnormalTime_List = []
+        # 不合格视频号_丢包时长累加列表
+        Loss_TotalTime_List = []
+        # 不合格视频号_最大时延占比列表
+        Delay_Max_List = []
+        # 总的不合格的原因列表
+        Total_Unqualified_Reason_List = []
+        for item in UnqualifiedList:
+            VideoNumber = item.split("_")[0]
+            CodeNumber = item.split("_")[1]
+            Total_Unqualified_Reason_List.append("%s_%s" % (VideoNumber,CodeNumber))
+        for item in UnqualifiedList:
+            CodeNumber = item.split("_")[1]
+            if  CodeNumber == ErrorCode[1] or CodeNumber == ErrorCode[2] or CodeNumber == ErrorCode[3]:
+                caller = item.split("_")[0]
+            elif CodeNumber == ErrorCode[11] or CodeNumber == ErrorCode[22] or CodeNumber == ErrorCode[33]:
+                called = item.split("_")[0]
+            else:
+                caller = item.split("_")[0]
+            if CodeNumber == ErrorCode[1]:
+                for item in UserList:
+                    if caller == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] == caller:
+                                    UpLossTotal += jtem["LossRateFinalC"]
+                                    TempUpDelayTwo = jtem["DelayTimeFim"] + jtem["DelayTimeErr"]
+                                    if TempUpDelayTwo == 0:
+                                        TempUpDelay = 0.0
+                                    else:
+                                        TempUpDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                                jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem[
+                                            "DelayTimeErr"]) * 100, 2)
+                                    TempUpDelayList.append(TempUpDelay)
+                Loss_TotalTime_List.append("%s_上行网络丢包累加时长%s秒" % (caller, UpLossTotal * 5))
+                if TempUpDelayList != []:
+                    Delay_Max_List.append("%s_上行网络最大时延占比%s" % (caller, max(TempUpDelayList)) + "%")
+            elif CodeNumber == ErrorCode[2]:
+                for item in UserList:
+                    if caller == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] == caller:
+                                    UpLossTotal += jtem["LossRateFinalC"]
+                Loss_TotalTime_List.append("%s_上行网络丢包累加时长%s秒" % (caller, UpLossTotal * 5))
+            elif CodeNumber == ErrorCode[3]:
+                for item in UserList:
+                    if caller == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] == caller:
+                                    TempUpDelayTwo = jtem["DelayTimeFim"] + jtem["DelayTimeErr"]
+                                    if TempUpDelayTwo == 0:
+                                        TempUpDelay = 0.0
+                                    else:
+                                        TempUpDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                                jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem[
+                                            "DelayTimeErr"]) * 100, 2)
+                                    TempUpDelayList.append(TempUpDelay)
+                if TempUpDelayList != []:
+                    Delay_Max_List.append("%s_上行网络最大时延占比%s" % (caller, max(TempUpDelayList)) + "%")
+            elif CodeNumber == ErrorCode[11]:
+                '''
+                for item in UserList:
+                    if called == item["UserId"]:
+                        for jtem in item["ASReport"]:
+                            if jtem["SpeakerId"] == caller:
+                                DownLossTotal += jtem["LossRateFinalC"]
+                                TempDownDelayTwo = jtem["DelayTimeFim"] + jtem["DelayTimeErr"]
+                                if TempDownDelayTwo == 0:
+                                    TempDownDelay = 0.0
+                                else:
+                                    TempDownDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                            jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem[
+                                        "DelayTimeErr"]) * 100, 2)
+                                TempDownDelayList.append(TempDownDelay)
+                Loss_TotalTime_List.append("%s_下行网络丢包累加时长%s秒" % (called, DownLossTotal * 5))
+                if TempDownDelayList != []:
+                    Delay_Max_List.append("%s_下行网络最大时延占比%s" % (called, max(TempDownDelayList)) + "%")
+                '''
+                for item in UserList:
+                    if called == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] != called:
+                                    DownLossTotal += jtem["LossRateFinalC"]
+                                    TempDownDelayTwo = jtem["DelayTimeFim"] + jtem["DelayTimeErr"]
+                                    if TempDownDelayTwo == 0:
+                                        TempDownDelay = 0.0
+                                    else:
+                                        TempDownDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                                jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem[
+                                            "DelayTimeErr"]) * 100, 2)
+                                    TempDownDelayList.append(TempDownDelay)
+                Loss_TotalTime_List.append("%s_下行网络丢包累加时长%s秒" % (called, DownLossTotal * 5))
+                if TempDownDelayList != []:
+                    Delay_Max_List.append("%s_下行网络最大时延占比%s" % (called, max(TempDownDelayList)) + "%")
+            elif CodeNumber == ErrorCode[22]:
+                for item in UserList:
+                    if called == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] != called:
+                                    DownLossTotal += jtem["LossRateFinalC"]
+                Loss_TotalTime_List.append("%s_下行网络丢包累加时长%s秒" % (called, DownLossTotal * 5))
+            elif CodeNumber == ErrorCode[33]:
+                for item in UserList:
+                    if called == item["UserId"]:
+                        if item["ASReport"] == None:
+                            continue
+                        else:
+                            for jtem in item["ASReport"]:
+                                if jtem["SpeakerId"] != called:
+                                    TempDownDelayTwo = jtem["DelayTimeFim"] + jtem["DelayTimeErr"]
+                                    if TempDownDelayTwo == 0:
+                                        TempDownDelay = 0.0
+                                    else:
+                                        TempDownDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                                jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem[
+                                            "DelayTimeErr"]) * 100, 2)
+                                    TempDownDelayList.append(TempDownDelay)
+                if TempDownDelayList != []:
+                    Delay_Max_List.append("%s_下行网络最大时延占比%s" % (called, max(TempDownDelayList)) + "%")
+            elif CodeNumber == ErrorCode[4]:
+                for item in UserList:
+                    if caller == item["UserId"]:
+                        CPU_AbnormalTime += item["CpuRate80C"]
+                CPU_AbnormalTime_List.append("%s_CPU异常时间%s秒" % (caller, CPU_AbnormalTime * 5))
+
+            CPU_AbnormalTime = 0
+            UpLossTotal = 0
+            DownLossTotal = 0
+            TempUpDelayList = []
+            TempDownDelayList = []
+        print(Total_Unqualified_Reason_List)
+        print(Delay_Max_List)
+        print(Loss_TotalTime_List)
+        print(CPU_AbnormalTime_List)
+        err_dict = {"Unqualified_Reason":Total_Unqualified_Reason_List,"Loss_TotalTime":Loss_TotalTime_List,"Delay_Max":Delay_Max_List,"CPU_AbnormalTime":CPU_AbnormalTime_List}
+        print(err_dict)
+        return err_dict
+
+"""
+        if Delay_Max_List != []:
+            Delay_Max_Result= Delay_Max_List
+        else:
+            Delay_Max_Result = []
+
+        if Loss_TotalTime_List != []:
+            DownLossTotal_Result = Loss_TotalTime_List
+        else:
+            DownLossTotal_Result = []
+
+        if Total_CPU_AbnormalTime_List != []:
+            CPU_AbnormalTime_Result = Total_CPU_AbnormalTime_List
+        else:
+            CPU_AbnormalTime_Result = []
+
+        #print(Unqualified_Reason_List)
+        err_dict = {"Unqualified_Reason":self.response_repeat_number(number_list=Total_Unqualified_Reason_List),"Loss_TotalTime":self.response_repeat_number(number_list=DownLossTotal_Result),"Delay_Max":self.response_repeat_number(number_list=Delay_Max_Result),"CPU_AbnormalTime":self.response_repeat_number(number_list=CPU_AbnormalTime_Result)}
+        print(err_dict)
+"""
+
+
+
+
+
+
+
