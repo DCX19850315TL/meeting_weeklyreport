@@ -1,0 +1,99 @@
+for item in UserList:
+    if caller == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                UpLossTotal += jtem["LossRateFinalC"]
+                TempUpDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem["DelayTimeErr"]),2) * 100
+                TempUpDelayList.append(TempUpDelay)
+Loss_TotalTime_List.append("%s_上行网络丢包累加时长%s秒" % (caller,UpLossTotal * 5))
+if TempUpDelayList != []:
+    Delay_Max_List.append("%s_上行网络最大时延占比%s" % (caller,max(TempUpDelayList)) + "%")
+
+for item in UserList:
+    if caller == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                UpLossTotal += jtem["LossRateFinalC"]
+Loss_TotalTime_List.append("%s_上行网络丢包累加时长%s秒" % (caller, UpLossTotal * 5))
+
+for item in UserList:
+    if caller == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                TempUpDelay = round(
+                    (jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (
+                                jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem[
+                            "DelayTimeFim"] + jtem["DelayTimeErr"]), 2) * 100
+                TempUpDelayList.append(TempUpDelay)
+if TempUpDelayList != []:
+    Delay_Max_List.append("%s_上行网络最大时延占比%s" % (caller, max(TempUpDelayList)) + "%")
+
+if Unqualified_Reason_List[0].split("_")[1] == ErrorCode[1]:
+    for item in args[0]:
+        original_caller = item.split("->")[0]
+        if original_caller == caller:
+            args[0].pop(item)
+
+for item in UserList:
+    if called == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                DownLossTotal += jtem["LossRateFinalC"]
+                TempDownDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem["DelayTimeErr"]),2) * 100
+                TempDownDelayList.append(TempDownDelay)
+Loss_TotalTime_List.append("%s_下行网络丢包累加时长%s秒" % (called,DownLossTotal * 5))
+if TempDownDelayList != []:
+    Delay_Max_List.append("%s_下行网络最大时延占比%s" % (called,max(TempDownDelayList)) + "%")
+
+for item in UserList:
+    if called == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                DownLossTotal += jtem["LossRateFinalC"]
+Loss_TotalTime_List.append("%s_下行网络丢包累加时长%s秒" % (called,DownLossTotal * 5))
+
+for item in UserList:
+    if called == item["UserId"]:
+        for jtem in item["ASReport"]:
+            if jtem["SpeakerId"] == caller:
+                TempDownDelay = round((jtem["DelayTimeFim"] + jtem["DelayTimeErr"]) / (jtem["DelayTimeCnf"] + jtem["DelayTimeEnt"] + jtem["DelayTimeFim"] + jtem["DelayTimeErr"]),2) * 100
+                TempDownDelayList.append(TempDownDelay)
+if TempDownDelayList != []:
+    Delay_Max_List.append("%s_下行网络最大时延占比%s" % (called,max(TempDownDelayList)) + "%")
+
+#CPU异常时间
+for item in UserList:
+    if caller == item["UserId"]:
+        CPU_AbnormalTime += item["CpuRate80C"]
+CPU_AbnormalTime_List.append("%s_CPU异常时间%s秒" % (caller, CPU_AbnormalTime * 5))
+else:
+CPU_AbnormalTime_List = []
+
+for item in CPU_AbnormalTime_List:
+    Total_CPU_AbnormalTime_List.append(item)
+CPU_AbnormalTime_List = []
+
+#CPU不合格的初始数值
+CPU_AbnormalTime = 0
+#CPU不合格的列表
+CPU_AbnormalTime_List = []
+#临时上行延迟列表
+TempUpDelayList = []
+#临时下行延迟列表
+TempDownDelayList = []
+#不合格视频号_丢包时长累加列表
+Loss_TotalTime_List = []
+#不合格视频号_最大时延占比列表
+Delay_Max_List = []
+#上行丢包总的时长初始值
+UpLossTotal = 0
+#下行丢包总的时长初始值
+DownLossTotal = 0
+#总的CPU不合格的列表
+Total_CPU_AbnormalTime_List = []
+
+CPU_AbnormalTime = 0
+UpLossTotal = 0
+DownLossTotal = 0
+TempUpDelayList = []
+TempDownDelayList = []

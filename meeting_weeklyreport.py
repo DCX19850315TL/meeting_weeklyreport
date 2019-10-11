@@ -135,20 +135,23 @@ if __name__ == "__main__":
                     print("%s会议开始调用黄志龙会议分析接口" % (json_data["data"][item]["mid"]))
                     logger().info("%s会议开始调用黄志龙会议分析接口" % (json_data["data"][item]["mid"]))
                     confReport_data = Analyze_data.GetConfReportApi(MeetingId=MeetingId,TodayTime=StartTime)
-                    print("%s会议调用黄志龙会议分析接口完毕" % (json_data["data"][item]["mid"]))
-                    logger().info("%s会议调用黄志龙会议分析接口完毕" % (json_data["data"][item]["mid"]))
-                    print("%s会议所包含的视频号不合格原因开始整理" % (json_data["data"][item]["mid"]))
-                    logger().info("%s会议所包含的视频号不合格原因开始整理" % (json_data["data"][item]["mid"]))
-                    UnqualifiedListResult = Analyze_data.AnalysisConfReportData(Unqualified_List,data=confReport_data)
-                    print("%s会议所包含的视频号不合格原因整理完毕" % (json_data["data"][item]["mid"]))
-                    logger().info("%s会议所包含的视频号不合格原因整理完毕" % (json_data["data"][item]["mid"]))
-                    print("%s会议所包含的视频号不合格原因具体数值开始整理" % (json_data["data"][item]["mid"]))
-                    logger().info("%s会议所包含的视频号不合格原因具体数值开始整理" % (json_data["data"][item]["mid"]))
-                    AnalyzeDataResult = Analyze_data.AnalysisUnqualifiedData(UnqualifiedList=UnqualifiedListResult,ResponseData=confReport_data)
-                    print("%s会议所包含的视频号不合格原因具体数值整理完毕" % (json_data["data"][item]["mid"]))
-                    logger().info("%s会议所包含的视频号不合格原因具体数值整理完毕" % (json_data["data"][item]["mid"]))
-                    #将新的四个字典数据添加到处理完的response_api_Analyze数据后面
-                    response_api_Analyze.update(AnalyzeDataResult)
+                    if confReport_data["User"] != None:
+                        print("%s会议调用黄志龙会议分析接口完毕" % (json_data["data"][item]["mid"]))
+                        logger().info("%s会议调用黄志龙会议分析接口完毕" % (json_data["data"][item]["mid"]))
+                        print("%s会议所包含的视频号不合格原因开始整理" % (json_data["data"][item]["mid"]))
+                        logger().info("%s会议所包含的视频号不合格原因开始整理" % (json_data["data"][item]["mid"]))
+                        UnqualifiedListResult = Analyze_data.AnalysisConfReportData(Unqualified_List,data=confReport_data)
+                        print("%s会议所包含的视频号不合格原因整理完毕" % (json_data["data"][item]["mid"]))
+                        logger().info("%s会议所包含的视频号不合格原因整理完毕" % (json_data["data"][item]["mid"]))
+                        print("%s会议所包含的视频号不合格原因具体数值开始整理" % (json_data["data"][item]["mid"]))
+                        logger().info("%s会议所包含的视频号不合格原因具体数值开始整理" % (json_data["data"][item]["mid"]))
+                        AnalyzeDataResult = Analyze_data.AnalysisUnqualifiedData(UnqualifiedList=UnqualifiedListResult,ResponseData=confReport_data)
+                        print("%s会议所包含的视频号不合格原因具体数值整理完毕" % (json_data["data"][item]["mid"]))
+                        logger().info("%s会议所包含的视频号不合格原因具体数值整理完毕" % (json_data["data"][item]["mid"]))
+                        #将新的四个字典数据添加到处理完的response_api_Analyze数据后面
+                        response_api_Analyze.update(AnalyzeDataResult)
+                    else:
+                        response_api_Analyze.update(NullAnalyzeDataResult)
                 else:
                     response_api_Analyze.update(NullAnalyzeDataResult)
                 if response_api_Analyze["Number_Count"] == 10041:

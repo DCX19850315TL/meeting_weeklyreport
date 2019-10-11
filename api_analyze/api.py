@@ -322,6 +322,8 @@ class confReport(object):
                     TotalTime = j["LastTS"] - j["BegTS"]
                     if j["CpuRate80C"] == 0:
                         CpuException = 0.0
+                    elif TotalTime == 0:
+                        CpuException = 0.0
                     else:
                         CpuException = round(j["CpuRate80C"] * 5 / TotalTime * 100,2)
                     if CpuException > cpu_percent:
@@ -364,6 +366,8 @@ class confReport(object):
                                 # 求CPU是否异常
                                 TotalTime = item["LastTS"] - item["BegTS"]
                                 if item["CpuRate80C"] == 0:
+                                    CpuException = 0.0
+                                elif TotalTime == 0:
                                     CpuException = 0.0
                                 else:
                                     CpuException = round(item["CpuRate80C"] * 5 / TotalTime * 100, 2)
